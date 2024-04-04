@@ -1,0 +1,66 @@
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.InetAddress;
+import java.net.MulticastSocket;
+import java.util.HashMap;
+import java.util.Map;
+
+public class ElectionVoteApplication {
+    private static final int PORT = 12345;
+    private static final String GROUP_ADDRESS = "224.0.0.1";
+    private static final int NUM_ELECTORATES = 5;
+
+    public static void main(String[] args) {
+        try {
+            MulticastSocket socket = new MulticastSocket(PORT);
+            InetAddress group = InetAddress.getByName(GROUP_ADDRESS);
+            socket.joinGroup(group);
+
+            Map<Integer, Character> votes = new HashMap<>();
+
+            for (int i = 0; i < NUM_ELECTORATES; i++) {
+                // Simulate each electorate casting a vote
+                char vote = (i % 2 == 0) ? 'A' : 'B'; // Alternate votes between A and B
+                votes.put(i, vote);
+
+                // Broadcast the vote to all other electorates
+                byte[] message = String.valueOf(vote).getBytes();
+                DatagramPacket packet = new DatagramPacket(message, message.length, group, PORT);
+                socket.send(packet);
+            }
+
+            // Receive votes from other electorates and count the votes
+            Map<Character, Integer> voteCount = new HashMap<>();
+            for (int i = 0; i < NUM_ELECTORATES; i++) {
+                byte[] buffer = new byte[10]; // Assuming each vote is represented by a single character
+                DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+                socket.receive(packet);
+                char receivedVote = (char) buffer[0];
+                voteCount.put(receivedVote, voteCount.getOrDefault(receivedVote, 0) + 1);
+            }
+
+            // Determine the winner
+            char winner = getWinner(voteCount);
+
+            // Display the winner
+            System.out.println("Winner: Candidate " + winner);
+
+            socket.leaveGroup(group);
+            socket.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static char getWinner(Map<Character, Integer> voteCount) {
+        int maxVotes = 0;
+        char winner = ' ';
+        for (Map.Entry<Character, Integer> entry : voteCount.entrySet()) {
+            if (entry.getValue() > maxVotes) {
+                maxVotes = entry.getValue();
+                winner = entry.getKey();
+            }
+        }
+        return winner;
+    }
+}
